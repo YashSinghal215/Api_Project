@@ -9,11 +9,6 @@ async def public_api():
 
 
 @router.get("/limited")
-async def limited_api(
-    request: Request,
-    userId: str = Query(...),
-    time: int = Query(..., description="Time window in seconds"),
-    maxCount: int = Query(..., description="Max requests allowed")
-):
-    await rate_limiter(request, userId, time, maxCount)
-    return {"message": "This API is rate limited"}
+async def limited(request: Request):
+    await rate_limiter(request)
+    return {"message": "Rate limited API working"}

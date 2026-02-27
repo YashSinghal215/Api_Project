@@ -1,30 +1,41 @@
 import time
 from fastapi import Request, HTTPException
 from redis_client import redis_client
+from config import settings
 
 
-async def rate_limiter(
-    request: Request,
-    user_id: str,
-    time_window: int,
-    max_count: int
-):
+async def rate_limiter(request: Request):
+    user_id = request.headers.get("X-User-Id")
     if not user_id:
-        raise HTTPException(status_code=400, detail="userId is required")
+        raise HTTPException(status_code=400, detail="X-User-Id header required")
 
     key = f"rate_limit:{user_id}"
-    print("hello")
-    try:
-        current_count = redis_client.incr(key)
-        print(current_count)
-        if current_count == 1:
-            redis_client.expire(key, time_window)
 
-        if current_count > max_count:
+    current_time = int(time.time() * 1000)
+    window_start = current_time - (settings.RATE_LIMIT_WINDOW * 1000)
+
+    try:
+        # Remove expired requests
+        redis_client.zremrangebyscore(key, 0, window_start)
+
+        # Get current request count
+        request_count = redis_client.zcard(key)
+
+        if request_count >= settings.RATE_LIMIT_MAX:
             raise HTTPException(
                 status_code=429,
-                detail=f"Rate limit exceeded. Max {max_count} requests in {time_window} seconds."
+                detail="Rate limit exceeded"
             )
 
-    except Exception:
-        raise HTTPException(status_code=500, detail="Rate limiter error")
+        # Add current request timestamp
+        redis_client.zadd(key, {str(current_time): current_time})
+
+        # Set expiry
+        redis_client.expire(key, settings.RATE_LIMIT_WINDOW)
+
+        return True
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Redis error:", e)
+        raise HTTPException(status_code=500, detail="Redis error")
