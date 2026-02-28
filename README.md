@@ -61,7 +61,7 @@ pip install fastapi uvicorn redis pydantic-settings redis_client redis-cli
 
 From the project root directory:-
 
-uvicorn app.main:app --reload
+uvicorn main:app --reload
 
 # 4. For API Endpoints
 GET /limited
